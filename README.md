@@ -18,57 +18,47 @@ A high-performance, multithreaded HTTP proxy server written in C that supports a
 
 ```mermaid
 flowchart TD
-    A[Client HTTP Request<br/>GET, POST, PUT, PATCH, DELETE] --> B[Proxy Server Port 8000]
-    B --> C[Accept Connection & Create Thread]
-    C --> D[Parse HTTP Request]
+    A[Client Request<br/>GET/POST/PUT/PATCH/DELETE] --> B[Proxy Server Port 8000<br/>pthread_create]
+    B --> C[Custom HTTP Parser<br/>ParsedRequest_parse]
+    C --> D{Valid HTTP?}
+    D -->|400| E[Bad Request Error]
+    D -->|Valid| F{Supported Method?}
+    F -->|501| G[Not Implemented Error]
+    F -->|Supported| H{GET Method?}
     
-    D --> E{Valid Request?}
-    E -->|No| F[Send 400 Bad Request]
-    E -->|Yes| G{Supported Method?}
+    H -->|Yes| I[Check LRU Cache<br/>find url method]
+    I --> J{Cache Hit?}
+    J -->|Hit| K[Return Cached Response<br/>Update LRU timestamp]
+    J -->|Miss| L[Connect Remote Server<br/>connectRemoteServer]
     
-    G -->|No| H[Send 501 Not Implemented]
-    G -->|Yes| I{GET Request?}
+    H -->|No| L
+    L --> M{Connection OK?}
+    M -->|500| N[Server Error]
+    M -->|Success| O[Forward Headers<br/>+ Request Body if present]
     
-    I -->|Yes| J[Check LRU Cache]
-    J --> K{Cache Hit?}
-    K -->|Yes| L[Return Cached Response]
-    K -->|No| M[Connect to Remote Server]
+    O --> P[Receive Response<br/>Forward to Client]
+    P --> Q{GET Response?}
+    Q -->|Yes| R[Store in Cache<br/>add_cache_element]
+    Q -->|No| S[Skip Caching<br/>POST/PUT/PATCH/DELETE]
     
-    I -->|No| M[Connect to Remote Server]
-    M --> N{Connection Success?}
-    N -->|No| O[Send 500 Server Error]
-    N -->|Yes| P[Forward Headers to Server]
-    
-    P --> Q{Request Has Body?}
-    Q -->|Yes| R[Forward Request Body<br/>POST/PUT/PATCH]
-    Q -->|No| S[Receive Server Response]
-    R --> S
-    
-    S --> T[Forward Response to Client]
-    T --> U{GET Request?}
-    U -->|Yes| V[Store Response in Cache]
-    U -->|No| W[Skip Caching]
-    
-    V --> X[Close All Connections]
-    W --> X
-    L --> X
-    F --> X
-    H --> X
-    O --> X
-    
-    X --> Y[Thread Complete]
+    R --> T[Close Connections<br/>sem_post pthread_exit]
+    S --> T
+    K --> T
+    E --> T
+    G --> T
+    N --> T
 
-    classDef client fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef proxy fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef cache fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
-    classDef server fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:2px
-    
+    classDef client fill:#e3f2fd,stroke:#1976d2
+    classDef proxy fill:#f3e5f5,stroke:#7b1fa2
+    classDef cache fill:#e8f5e8,stroke:#388e3c
+    classDef server fill:#fff3e0,stroke:#f57c00
+    classDef error fill:#ffebee,stroke:#d32f2f
+
     class A client
-    class B,C,D,G,I proxy
-    class J,K,L,V cache
-    class M,N,P,Q,R,S,T server
-    class F,H,O error
+    class B,C,F,H proxy
+    class I,J,K,R cache
+    class L,M,O,P server
+    class D,E,G,N,Q,S,T error
 ```
 
 ## Technical Specifications

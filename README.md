@@ -15,66 +15,113 @@ A high-performance, multithreaded HTTP proxy server written in C that supports a
 
 ## Architecture Overview
 
-```mermaid
-flowchart LR
-    A[Client sends HTTP request<br/>GET/POST/PUT/PATCH/DELETE] --> B[Proxy Server<br/>Port 8000]
+flowchart TB
+    %% CLIENT SIDE - Where HTTP requests originate
+    subgraph "CLIENT SIDE"
+        A[HTTP Request<br/>GET POST PUT PATCH DELETE]
+    end
     
-    B --> C{Connection<br/>Accepted?}
-    C -->|No| D[Connection<br/>Rejected]
-    C -->|Yes| E[Create New Thread<br/>sem_wait]
+    %% PROXY SERVER - Main processing logic
+    subgraph "PROXY SERVER - PORT 8000"
+        B[Accept Connection]
+        C[Create Thread]
+        D[Parse HTTP Request]
+        E{Valid Request?}
+        F{Supported Method?}
+        G{GET Request?}
+    end
     
-    E --> F[Receive HTTP Request<br/>Buffer 16KB]
-    F --> G[Custom HTTP Parser<br/>ParsedRequest_parse]
+    %% CACHING SYSTEM - LRU cache for GET requests only
+    subgraph "CACHING SYSTEM"
+        H[Check Cache]
+        I{Cache Hit?}
+        J[Return Cached Data]
+        K[Update LRU Time]
+    end
     
-    G --> H{Valid HTTP<br/>Request?}
-    H -->|No| I[Send 400<br/>Bad Request]
-    H -->|Yes| J[Extract Method<br/>Host Path Headers Body]
+    %% REMOTE SERVER - Target server communication
+    subgraph "REMOTE SERVER"
+        L[Connect to Target Server]
+        M[Forward Headers]
+        N{Has Request Body?}
+        O[Forward Body Data]
+        P[Receive Response]
+    end
     
-    J --> K{Supported<br/>Method?}
-    K -->|No| L[Send 501<br/>Not Implemented]
-    K -->|Yes| M{Method<br/>GET?}
+    %% RESPONSE HANDLING - Send back to client
+    subgraph "RESPONSE HANDLING"
+        Q[Send Response to Client]
+        R{Cache Response?}
+        S[Store in Cache]
+        T[Close Connections]
+    end
     
-    M -->|Yes| N[Check Cache<br/>find url method]
-    N --> O{Found in<br/>Cache?}
-    O -->|Yes| P[Send Cached Response<br/>Update LRU]
-    O -->|No| Q[Cache Miss<br/>Connect to Server]
+    %% ERROR HANDLING - HTTP error responses
+    subgraph "ERROR HANDLING"
+        U[400 Bad Request]
+        V[501 Not Implemented]
+        W[500 Server Error]
+    end
     
-    M -->|No| Q[Non-cacheable Method<br/>POST/PUT/PATCH/DELETE]
+    %% MAIN FLOW - Primary request processing path
+    A --> B
+    B --> C
+    C --> D
+    D --> E
     
-    Q --> R[Connect Remote Server<br/>connectRemoteServer]
-    R --> S{Connection<br/>Success?}
-    S -->|No| T[Send 500<br/>Internal Error]
-    S -->|Yes| U[Forward Headers<br/>to Remote Server]
+    %% ERROR PATHS - Invalid or unsupported requests
+    E -->|Invalid| U
+    E -->|Valid| F
+    F -->|Unsupported| V
+    F -->|Supported| G
     
-    U --> V{Request has<br/>Body?}
-    V -->|Yes| W[Forward Body<br/>POST/PUT/PATCH]
-    V -->|No| X[Receive Response<br/>from Server]
-    W --> X
+    %% GET REQUEST CACHE PATH - Only for GET requests
+    G -->|Yes| H
+    H --> I
+    I -->|Hit| J
+    J --> K
+    K --> T
     
-    X --> Y[Forward Response<br/>to Client]
-    Y --> Z{Method<br/>GET?}
-    Z -->|Yes| AA[Store in Cache<br/>add_cache_element]
-    Z -->|No| BB[Skip Caching<br/>Non-safe methods]
+    %% NON-CACHEABLE OR CACHE MISS - Go to remote server
+    I -->|Miss| L
+    G -->|No| L
     
-    AA --> CC[LRU Management<br/>Check MAX_SIZE]
-    CC --> DD{Cache<br/>Full?}
-    DD -->|Yes| EE[Remove Oldest<br/>remove_cache_element]
-    DD -->|No| FF[Add to Cache<br/>timestamp]
-    EE --> FF
+    %% REMOTE SERVER COMMUNICATION - Forward request and get response
+    L -->|Success| M
+    L -->|Fail| W
+    M --> N
+    N -->|Yes| O  %% POST/PUT/PATCH have bodies
+    N -->|No| P   %% GET/DELETE usually no body
+    O --> P
+    P --> Q
     
-    BB --> GG[Close Connections<br/>Free Memory]
-    FF --> GG
-    P --> GG
+    %% RESPONSE PROCESSING - Handle response and optional caching
+    Q --> R
+    R -->|GET Only| S    %% Only cache GET responses
+    R -->|Others| T     %% Don't cache POST/PUT/PATCH/DELETE
+    S --> T
     
-    GG --> HH[sem_post<br/>Thread Exit]
+    %% ALL ERRORS LEAD TO CONNECTION CLOSE
+    U --> T
+    V --> T
+    W --> T
+
+    %% STYLING - Color coding for different components
+    classDef client fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,font-weight:bold,font-size:14px
+    classDef proxy fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,font-weight:bold,font-size:14px
+    classDef cache fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,font-weight:bold,font-size:14px
+    classDef remote fill:#fff3e0,stroke:#f57c00,stroke-width:3px,font-weight:bold,font-size:14px
+    classDef response fill:#fce4ec,stroke:#c2185b,stroke-width:3px,font-weight:bold,font-size:14px
+    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:3px,font-weight:bold,font-size:14px
     
-    I --> II[Close Connection]
-    L --> II
-    T --> II
-    D --> II
-    II --> JJ[Connection<br/>Terminated]
-    HH --> JJ
-```
+    %% APPLY STYLING TO COMPONENTS
+    class A client
+    class B,C,D,E,F,G proxy
+    class H,I,J,K,S cache
+    class L,M,N,O,P remote
+    class Q,R,T response
+    class U,V,W error
+
 ## Technical Specifications
 
 ### Core Components

@@ -15,6 +15,7 @@ A high-performance, multithreaded HTTP proxy server written in C that supports a
 
 ## Architecture Overview
 
+```mermaid
 flowchart TB
     %% CLIENT SIDE - Where HTTP requests originate
     subgraph "CLIENT SIDE"
@@ -121,6 +122,7 @@ flowchart TB
     class L,M,N,O,P remote
     class Q,R,T response
     class U,V,W error
+```
 
 ## Technical Specifications
 

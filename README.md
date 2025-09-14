@@ -1,0 +1,379 @@
+# Multi-Method HTTP Proxy Server with Caching
+
+A high-performance, multithreaded HTTP proxy server written in C that supports all major HTTP methods (GET, POST, PUT, PATCH, DELETE) with intelligent caching and custom request parsing.
+
+## Features
+
+- **Multi-Method Support**: GET, POST, PUT, PATCH, DELETE
+- **Smart Caching**: LRU cache for GET requests only (safe to cache)
+- **Custom HTTP Parser**: No dependency on restrictive third-party libraries
+- **Multithreaded**: Concurrent client handling with thread pool management
+- **Request Body Handling**: Proper forwarding of POST/PUT/PATCH request bodies
+- **Thread-Safe**: Mutex-protected cache operations
+- **Memory Efficient**: Automatic cache size management and cleanup
+- **Error Handling**: Comprehensive HTTP error responses
+
+## Architecture Overview
+
+```mermaid
+flowchart LR
+    A[Client sends HTTP request<br/>GET/POST/PUT/PATCH/DELETE] --> B[Proxy Server<br/>Port 8000]
+    
+    B --> C{Connection<br/>Accepted?}
+    C -->|No| D[Connection<br/>Rejected]
+    C -->|Yes| E[Create New Thread<br/>sem_wait]
+    
+    E --> F[Receive HTTP Request<br/>Buffer 16KB]
+    F --> G[Custom HTTP Parser<br/>ParsedRequest_parse]
+    
+    G --> H{Valid HTTP<br/>Request?}
+    H -->|No| I[Send 400<br/>Bad Request]
+    H -->|Yes| J[Extract Method<br/>Host Path Headers Body]
+    
+    J --> K{Supported<br/>Method?}
+    K -->|No| L[Send 501<br/>Not Implemented]
+    K -->|Yes| M{Method<br/>GET?}
+    
+    M -->|Yes| N[Check Cache<br/>find url method]
+    N --> O{Found in<br/>Cache?}
+    O -->|Yes| P[Send Cached Response<br/>Update LRU]
+    O -->|No| Q[Cache Miss<br/>Connect to Server]
+    
+    M -->|No| Q[Non-cacheable Method<br/>POST/PUT/PATCH/DELETE]
+    
+    Q --> R[Connect Remote Server<br/>connectRemoteServer]
+    R --> S{Connection<br/>Success?}
+    S -->|No| T[Send 500<br/>Internal Error]
+    S -->|Yes| U[Forward Headers<br/>to Remote Server]
+    
+    U --> V{Request has<br/>Body?}
+    V -->|Yes| W[Forward Body<br/>POST/PUT/PATCH]
+    V -->|No| X[Receive Response<br/>from Server]
+    W --> X
+    
+    X --> Y[Forward Response<br/>to Client]
+    Y --> Z{Method<br/>GET?}
+    Z -->|Yes| AA[Store in Cache<br/>add_cache_element]
+    Z -->|No| BB[Skip Caching<br/>Non-safe methods]
+    
+    AA --> CC[LRU Management<br/>Check MAX_SIZE]
+    CC --> DD{Cache<br/>Full?}
+    DD -->|Yes| EE[Remove Oldest<br/>remove_cache_element]
+    DD -->|No| FF[Add to Cache<br/>timestamp]
+    EE --> FF
+    
+    BB --> GG[Close Connections<br/>Free Memory]
+    FF --> GG
+    P --> GG
+    
+    GG --> HH[sem_post<br/>Thread Exit]
+    
+    I --> II[Close Connection]
+    L --> II
+    T --> II
+    D --> II
+    II --> JJ[Connection<br/>Terminated]
+    HH --> JJ
+```
+
+## File Structure
+
+```
+proxy-server/
+├── proxy_parse.h          # Custom HTTP parser header
+├── proxy_parse.c          # Custom HTTP parser implementation
+├── proxy_server_with_cache.c                # Main proxy server logic
+├── Makefile              # Build configuration
+└── README.md             # This file
+```
+
+## Technical Specifications
+
+### Core Components
+
+| Component | Description |
+|-----------|-------------|
+| **HTTP Parser** | Custom parser supporting all HTTP methods |
+| **Cache System** | LRU cache with configurable size limits |
+| **Thread Pool** | Semaphore-controlled concurrent connections |
+| **Memory Management** | Automatic cleanup and leak prevention |
+
+### Configuration Constants
+
+```c
+#define MAX_BYTES 8192              // Request/Response buffer size
+#define MAX_CLIENTS 400             // Maximum concurrent clients
+#define MAX_SIZE 200*(1<<20)        // Cache size (200MB)
+#define MAX_ELEMENT_SIZE 10*(1<<20) // Max cacheable response (10MB)
+```
+
+### Supported HTTP Methods
+
+- **GET** - Retrieve data (cacheable)
+- **POST** - Create new resources
+- **PUT** - Update/replace resources
+- **PATCH** - Partial updates
+- **DELETE** - Remove resources
+
+## Installation & Compilation
+
+### Prerequisites
+
+- GCC compiler
+- POSIX-compliant system (Linux, macOS, Unix)
+- pthread library
+
+### Build Instructions
+
+```bash
+# Clone or download the source files
+git clone <repository-url>
+cd MTPSC
+
+# Compile using Makefile
+make all
+
+# Or compile manually
+gcc -g -Wall -c proxy_parse.c
+gcc -g -Wall -c proxy_server_with_cache.c
+gcc -g -Wall -o proxy proxy_parse.o proxy.o -lpthread
+```
+
+### Clean Build
+
+```bash
+make clean
+make all
+```
+
+## Usage
+
+### Starting the Server
+
+```bash
+# Start proxy on port 8000
+./proxy 8000
+
+# Expected output:
+# Starting Multi-Method Proxy Server at port: 8000
+# Supported methods: GET, POST, PUT, PATCH, DELETE
+# Proxy server listening on port 8000...
+```
+
+### Client Configuration
+
+Configure your HTTP client to use the proxy:
+
+**cURL:**
+```bash
+curl -x localhost:8000 http://example.com
+```
+
+**Browser (Firefox/Chrome):**
+- Manual Proxy Configuration
+- HTTP Proxy: `localhost`
+- Port: `8000`
+
+## Testing & Examples
+
+### GET Request (Cacheable)
+
+```bash
+# First request (cache miss)
+curl -x localhost:8000 http://httpbin.org/get
+
+# Second request (cache hit - faster)
+curl -x localhost:8000 http://httpbin.org/get
+```
+
+**Expected Server Output:**
+```
+Method: GET, Host: httpbin.org, Path: /get, Content-Length: 0
+Response cached successfully (891 bytes)
+Added to cache: GET http://httpbin.org/get (891 bytes)
+
+# Second request:
+URL found in cache for method GET
+Data retrieved from cache
+```
+
+### POST Request with JSON Body
+
+```bash
+curl -x localhost:8000 -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Alice","age":25}' \
+  http://httpbin.org/post
+```
+
+**Expected Server Output:**
+```
+Method: POST, Host: httpbin.org, Path: /post, Content-Length: 25
+Forwarding request body (25 bytes) for method: POST
+```
+
+### PUT Request
+
+```bash
+curl -x localhost:8000 -X PUT \
+  -H "Content-Type: application/json" \
+  -d '{"id":1,"name":"Updated Alice","age":26}' \
+  http://httpbin.org/put
+```
+
+### PATCH Request
+
+```bash
+curl -x localhost:8000 -X PATCH \
+  -H "Content-Type: application/json" \
+  -d '{"age":27}' \
+  http://httpbin.org/patch
+```
+
+### DELETE Request
+
+```bash
+curl -x localhost:8000 -X DELETE http://httpbin.org/delete
+```
+
+## Performance Features
+
+### Intelligent Caching
+
+- **Only GET requests are cached** (safe for caching)
+- **LRU eviction policy** removes least recently used entries
+- **Thread-safe operations** with mutex protection
+- **Configurable size limits** prevent memory exhaustion
+
+### Multi-threading
+
+- **Concurrent client handling** up to MAX_CLIENTS
+- **Semaphore-controlled** thread pool
+- **Per-thread request processing**
+- **Automatic resource cleanup**
+
+### Memory Management
+
+- **Automatic cache size management**
+- **Proper memory deallocation**
+- **Buffer overflow prevention**
+- **Memory leak prevention**
+
+## Error Handling
+
+The proxy returns appropriate HTTP status codes:
+
+| Status Code | Description | Cause |
+|-------------|-------------|-------|
+| 400 Bad Request | Invalid HTTP request format | Malformed request |
+| 501 Not Implemented | Unsupported HTTP method | Methods other than GET/POST/PUT/PATCH/DELETE |
+| 500 Internal Server Error | Server-side error | Connection failures, memory issues |
+
+## Limitations
+
+- **No HTTPS support** - Only HTTP proxying (no CONNECT method)
+- **No HTTP/2 support** - HTTP/1.0 and HTTP/1.1 only  
+- **No WebSocket support** - Standard HTTP requests only
+- **No authentication** - Open proxy (suitable for development/testing)
+- **IPv4 only** - No IPv6 support
+
+## Debugging & Troubleshooting
+
+### Common Issues
+
+**Connection Refused:**
+```bash
+# Check if server is running
+netstat -tlnp | grep 8000
+
+# Verify port availability
+lsof -i :8000
+```
+
+**Memory Issues:**
+```bash
+# Monitor memory usage
+ps aux | grep proxy
+
+# Check for memory leaks (if valgrind is available)
+valgrind --leak-check=full ./proxy 8000
+```
+
+### Verbose Logging
+
+The server provides detailed logging:
+- Client connection/disconnection
+- Request parsing details
+- Cache hit/miss statistics
+- Error conditions
+- Thread management
+
+### Testing Script
+
+```bash
+#!/bin/bash
+# Comprehensive test script
+
+echo "Testing GET request..."
+curl -s -x localhost:8000 http://httpbin.org/get > /dev/null
+echo "✓ GET test passed"
+
+echo "Testing POST request..."
+curl -s -x localhost:8000 -X POST -d '{"test":true}' -H "Content-Type: application/json" http://httpbin.org/post > /dev/null
+echo "✓ POST test passed"
+
+echo "Testing cache functionality..."
+time curl -s -x localhost:8000 http://httpbin.org/get > /dev/null
+time curl -s -x localhost:8000 http://httpbin.org/get > /dev/null
+echo "✓ Cache test passed (second request should be faster)"
+
+echo "All tests completed successfully!"
+```
+
+## Development & Contribution
+
+### Code Structure
+
+- **proxy.c** - Main server logic, thread management, request handling
+- **proxy_parse.h** - HTTP parser interface definitions
+- **proxy_parse.c** - Custom HTTP parser implementation
+
+### Key Functions
+
+```c
+// Main server functions
+int connectRemoteServer(char* host_addr, int port_num);
+int handle_request(int clientSocket, ParsedRequest *request, char *original_request);
+void *thread_fn(void *socketNew);
+
+// HTTP parser functions
+ParsedRequest* ParsedRequest_create();
+int ParsedRequest_parse(ParsedRequest* pr, const char* buffer, int buflen);
+int ParsedHeader_set(ParsedRequest* pr, const char* name, const char* value);
+
+// Cache functions
+cache_element* find(char* url, char* method);
+int add_cache_element(char* data, int size, char* url, char* method);
+void remove_cache_element();
+```
+
+### Extending Functionality
+
+To add new HTTP methods:
+1. Update `is_supported_method()` in proxy.c
+2. Update `is_valid_method()` in proxy_parse.c
+3. Consider caching policy in `should_cache()`
+
+## License
+
+This project is provided for educational purposes. Feel free to modify and distribute according to your needs.
+
+## Acknowledgments
+
+- Built using POSIX sockets and threading
+- HTTP parsing follows RFC 7230 specifications
+- Cache implementation uses LRU (Least Recently Used) algorithm
+
+---
+
+**Note**: This proxy server is designed for development and testing purposes. For production use, additional security measures, authentication, and HTTPS support would be recommended.

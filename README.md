@@ -15,113 +15,60 @@ A high-performance, multithreaded HTTP proxy server written in C that supports a
 
 ## Architecture Overview
 
-```mermaid
-flowchart TB
-    %% CLIENT SIDE - Where HTTP requests originate
-    subgraph "CLIENT SIDE"
-        A[HTTP Request<br/>GET POST PUT PATCH DELETE]
-    end
-    
-    %% PROXY SERVER - Main processing logic
-    subgraph "PROXY SERVER - PORT 8000"
-        B[Accept Connection]
-        C[Create Thread]
-        D[Parse HTTP Request]
-        E{Valid Request?}
-        F{Supported Method?}
-        G{GET Request?}
-    end
-    
-    %% CACHING SYSTEM - LRU cache for GET requests only
-    subgraph "CACHING SYSTEM"
-        H[Check Cache]
-        I{Cache Hit?}
-        J[Return Cached Data]
-        K[Update LRU Time]
-    end
-    
-    %% REMOTE SERVER - Target server communication
-    subgraph "REMOTE SERVER"
-        L[Connect to Target Server]
-        M[Forward Headers]
-        N{Has Request Body?}
-        O[Forward Body Data]
-        P[Receive Response]
-    end
-    
-    %% RESPONSE HANDLING - Send back to client
-    subgraph "RESPONSE HANDLING"
-        Q[Send Response to Client]
-        R{Cache Response?}
-        S[Store in Cache]
-        T[Close Connections]
-    end
-    
-    %% ERROR HANDLING - HTTP error responses
-    subgraph "ERROR HANDLING"
-        U[400 Bad Request]
-        V[501 Not Implemented]
-        W[500 Server Error]
-    end
-    
-    %% MAIN FLOW - Primary request processing path
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    
-    %% ERROR PATHS - Invalid or unsupported requests
-    E -->|Invalid| U
-    E -->|Valid| F
-    F -->|Unsupported| V
-    F -->|Supported| G
-    
-    %% GET REQUEST CACHE PATH - Only for GET requests
-    G -->|Yes| H
-    H --> I
-    I -->|Hit| J
-    J --> K
-    K --> T
-    
-    %% NON-CACHEABLE OR CACHE MISS - Go to remote server
-    I -->|Miss| L
-    G -->|No| L
-    
-    %% REMOTE SERVER COMMUNICATION - Forward request and get response
-    L -->|Success| M
-    L -->|Fail| W
-    M --> N
-    N -->|Yes| O  %% POST/PUT/PATCH have bodies
-    N -->|No| P   %% GET/DELETE usually no body
-    O --> P
-    P --> Q
-    
-    %% RESPONSE PROCESSING - Handle response and optional caching
-    Q --> R
-    R -->|GET Only| S    %% Only cache GET responses
-    R -->|Others| T     %% Don't cache POST/PUT/PATCH/DELETE
-    S --> T
-    
-    %% ALL ERRORS LEAD TO CONNECTION CLOSE
-    U --> T
-    V --> T
-    W --> T
 
-    %% STYLING - Color coding for different components
-    classDef client fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,font-weight:bold,font-size:14px
-    classDef proxy fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,font-weight:bold,font-size:14px
-    classDef cache fill:#e8f5e8,stroke:#388e3c,stroke-width:3px,font-weight:bold,font-size:14px
-    classDef remote fill:#fff3e0,stroke:#f57c00,stroke-width:3px,font-weight:bold,font-size:14px
-    classDef response fill:#fce4ec,stroke:#c2185b,stroke-width:3px,font-weight:bold,font-size:14px
-    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:3px,font-weight:bold,font-size:14px
+```mermaid
+flowchart TD
+    A[Client HTTP Request<br/>GET, POST, PUT, PATCH, DELETE] --> B[Proxy Server Port 8000]
+    B --> C[Accept Connection & Create Thread]
+    C --> D[Parse HTTP Request]
     
-    %% APPLY STYLING TO COMPONENTS
+    D --> E{Valid Request?}
+    E -->|No| F[Send 400 Bad Request]
+    E -->|Yes| G{Supported Method?}
+    
+    G -->|No| H[Send 501 Not Implemented]
+    G -->|Yes| I{GET Request?}
+    
+    I -->|Yes| J[Check LRU Cache]
+    J --> K{Cache Hit?}
+    K -->|Yes| L[Return Cached Response]
+    K -->|No| M[Connect to Remote Server]
+    
+    I -->|No| M[Connect to Remote Server]
+    M --> N{Connection Success?}
+    N -->|No| O[Send 500 Server Error]
+    N -->|Yes| P[Forward Headers to Server]
+    
+    P --> Q{Request Has Body?}
+    Q -->|Yes| R[Forward Request Body<br/>POST/PUT/PATCH]
+    Q -->|No| S[Receive Server Response]
+    R --> S
+    
+    S --> T[Forward Response to Client]
+    T --> U{GET Request?}
+    U -->|Yes| V[Store Response in Cache]
+    U -->|No| W[Skip Caching]
+    
+    V --> X[Close All Connections]
+    W --> X
+    L --> X
+    F --> X
+    H --> X
+    O --> X
+    
+    X --> Y[Thread Complete]
+
+    classDef client fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef proxy fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef cache fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef server fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef error fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    
     class A client
-    class B,C,D,E,F,G proxy
-    class H,I,J,K,S cache
-    class L,M,N,O,P remote
-    class Q,R,T response
-    class U,V,W error
+    class B,C,D,G,I proxy
+    class J,K,L,V cache
+    class M,N,P,Q,R,S,T server
+    class F,H,O error
 ```
 
 ## Technical Specifications

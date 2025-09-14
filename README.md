@@ -75,18 +75,6 @@ flowchart LR
     II --> JJ[Connection<br/>Terminated]
     HH --> JJ
 ```
-
-## File Structure
-
-```
-proxy-server/
-├── proxy_parse.h          # Custom HTTP parser header
-├── proxy_parse.c          # Custom HTTP parser implementation
-├── proxy_server_with_cache.c                # Main proxy server logic
-├── Makefile              # Build configuration
-└── README.md             # This file
-```
-
 ## Technical Specifications
 
 ### Core Components
@@ -97,15 +85,6 @@ proxy-server/
 | **Cache System** | LRU cache with configurable size limits |
 | **Thread Pool** | Semaphore-controlled concurrent connections |
 | **Memory Management** | Automatic cleanup and leak prevention |
-
-### Configuration Constants
-
-```c
-#define MAX_BYTES 8192              // Request/Response buffer size
-#define MAX_CLIENTS 400             // Maximum concurrent clients
-#define MAX_SIZE 200*(1<<20)        // Cache size (200MB)
-#define MAX_ELEMENT_SIZE 10*(1<<20) // Max cacheable response (10MB)
-```
 
 ### Supported HTTP Methods
 

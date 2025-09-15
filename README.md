@@ -15,51 +15,7 @@ A high-performance, multithreaded HTTP proxy server written in C that supports a
 
 ## Architecture Overview
 
-
-```mermaid
-flowchart TD
-    A[Client Request<br/>GET/POST/PUT/PATCH/DELETE] --> B[Proxy Server Port 8000<br/>pthread_create]
-    B --> C[Custom HTTP Parser<br/>ParsedRequest_parse]
-    C --> D{Valid HTTP?}
-    D -->|400| E[Bad Request Error]
-    D -->|Valid| F{Supported Method?}
-    F -->|501| G[Not Implemented Error]
-    F -->|Supported| H{GET Method?}
-    
-    H -->|Yes| I[Check LRU Cache<br/>find url method]
-    I --> J{Cache Hit?}
-    J -->|Hit| K[Return Cached Response<br/>Update LRU timestamp]
-    J -->|Miss| L[Connect Remote Server<br/>connectRemoteServer]
-    
-    H -->|No| L
-    L --> M{Connection OK?}
-    M -->|500| N[Server Error]
-    M -->|Success| O[Forward Headers<br/>+ Request Body if present]
-    
-    O --> P[Receive Response<br/>Forward to Client]
-    P --> Q{GET Response?}
-    Q -->|Yes| R[Store in Cache<br/>add_cache_element]
-    Q -->|No| S[Skip Caching<br/>POST/PUT/PATCH/DELETE]
-    
-    R --> T[Close Connections<br/>sem_post pthread_exit]
-    S --> T
-    K --> T
-    E --> T
-    G --> T
-    N --> T
-
-    classDef client fill:#e3f2fd,stroke:#1976d2
-    classDef proxy fill:#f3e5f5,stroke:#7b1fa2
-    classDef cache fill:#e8f5e8,stroke:#388e3c
-    classDef server fill:#fff3e0,stroke:#f57c00
-    classDef error fill:#ffebee,stroke:#d32f2f
-
-    class A client
-    class B,C,F,H proxy
-    class I,J,K,R cache
-    class L,M,O,P server
-    class D,E,G,N,Q,S,T error
-```
+![Proxy UML Diagram](docs/uml.png)
 
 ## Technical Specifications
 

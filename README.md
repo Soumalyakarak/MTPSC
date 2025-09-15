@@ -280,6 +280,10 @@ void remove_cache_element();
 
 ### Extending Functionality
 
+-This code can be implemented using multiprocessing that can speed up the process with parallelism.
+
+-We can decide which type of websites should be allowed by extending the code.
+
 To add new HTTP methods:
 1. Update `is_supported_method()` in proxy.c
 2. Update `is_valid_method()` in proxy_parse.c
@@ -287,7 +291,14 @@ To add new HTTP methods:
 
 ## License
 
-This project is provided for educational purposes. Feel free to modify and distribute according to your needs.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+MIT License
+
+Copyright (c) 2024 Soumalya Karak
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software")...
 
 ## Acknowledgments
 
@@ -297,4 +308,4 @@ This project is provided for educational purposes. Feel free to modify and distr
 
 ---
 
-**Note**: This proxy server is designed for development and testing purposes. For production use, additional security measures, authentication, and HTTPS support would be recommended.
+**Note**: This code can only be run in Linux Machine. Please disable your browser cache.

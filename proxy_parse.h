@@ -2,7 +2,6 @@
 #define PROXY_PARSE_H
 
 // Custom proxy_parse.h that supports all HTTP methods
-// Compatible interface with original proxy_parse.h but extended functionality
 
 #include <stdio.h>
 #include <stdlib.h>

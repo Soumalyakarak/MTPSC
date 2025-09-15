@@ -15,7 +15,7 @@ A high-performance, multithreaded HTTP proxy server written in C that supports a
 
 ## Architecture Overview
 
-![Proxy UML Diagram](docs/uml.png)
+![Proxy UML Diagram](Docs/uml.png)
 
 ## Technical Specifications
 

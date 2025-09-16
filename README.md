@@ -173,6 +173,12 @@ curl -x localhost:8000 -X DELETE http://httpbin.org/delete
 - **Per-thread request processing**
 - **Automatic resource cleanup**
 
+### Demo
+
+(Docs/curl1.png)
+(Docs/curl2.png)
+(Docs/browser.png)
+
 ### Memory Management
 
 - **Automatic cache size management**
@@ -308,4 +314,4 @@ of this software and associated documentation files (the "Software")...
 
 ---
 
-**Note**: This code can only be run in Linux Machine. Please disable your browser cache.
+**Note**: This code can only be run in Linux Machine.If you want browsers to work with HTTPS sites, you'd need to implement basic CONNECT method tunneling.

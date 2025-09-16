@@ -311,7 +311,7 @@ void *thread_fn(void *socketNew){
         sem_post(&semaphore);
         return NULL;
     }
-    
+
     // Ensure complete HTTP request
     while(bytes_recv > 0 && !strstr(buffer, "\r\n\r\n")) {
         int len = strlen(buffer);

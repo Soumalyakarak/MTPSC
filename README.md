@@ -256,34 +256,7 @@ echo "✓ Cache test passed (second request should be faster)"
 echo "All tests completed successfully!"
 ```
 
-## Development & Contribution
-
-### Code Structure
-
-- **proxy.c** - Main server logic, thread management, request handling
-- **proxy_parse.h** - HTTP parser interface definitions
-- **proxy_parse.c** - Custom HTTP parser implementation
-
-### Key Functions
-
-```c
-// Main server functions
-int connectRemoteServer(char* host_addr, int port_num);
-int handle_request(int clientSocket, ParsedRequest *request, char *original_request);
-void *thread_fn(void *socketNew);
-
-// HTTP parser functions
-ParsedRequest* ParsedRequest_create();
-int ParsedRequest_parse(ParsedRequest* pr, const char* buffer, int buflen);
-int ParsedHeader_set(ParsedRequest* pr, const char* name, const char* value);
-
-// Cache functions
-cache_element* find(char* url, char* method);
-int add_cache_element(char* data, int size, char* url, char* method);
-void remove_cache_element();
-```
-
-### Extending Functionality
+## Extending Functionality
 
 -This code can be implemented using multiprocessing that can speed up the process with parallelism.
 

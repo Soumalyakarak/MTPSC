@@ -156,6 +156,11 @@ curl -x localhost:8000 -X PATCH \
 ```bash
 curl -x localhost:8000 -X DELETE http://httpbin.org/delete
 ```
+### Demo
+
+- [curl request 1](Docs/curl1.png)
+- [curl request 2](Docs/curl2.png)
+- [browser screenshot](Docs/browser.png)
 
 ## Performance Features
 
@@ -172,12 +177,6 @@ curl -x localhost:8000 -X DELETE http://httpbin.org/delete
 - **Semaphore-controlled** thread pool
 - **Per-thread request processing**
 - **Automatic resource cleanup**
-
-### Demo
-
-(Docs/curl1.png)
-(Docs/curl2.png)
-(Docs/browser.png)
 
 ### Memory Management
 
